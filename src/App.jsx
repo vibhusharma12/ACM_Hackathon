@@ -151,9 +151,12 @@ function ProductivityChart({ completedTasks }) {
     days.push(d.toDateString());
   }
   const data = days.map((day) =>
-    completedTasks
-      .filter((t) => new Date(t.completedAt).toDateString() === day)
-      .reduce((s, t) => s + t.focusMinutes * t.sessions, 0)
+    Number(
+      completedTasks
+        .filter((t) => new Date(t.completedAt).toDateString() === day)
+        .reduce((s, t) => s + t.focusMinutes * t.sessions, 0)
+        .toFixed(1)
+    )
   );
   const maxVal = Math.max(...data, 1);
   const W = 340, H = 150, PAD = 24;
@@ -262,14 +265,14 @@ function FocusBreakRatio({ completedTasks }) {
           <div className="ratio-track">
             <div className="ratio-fill ratio-focus" style={{ width: `${focusPct}%` }} />
           </div>
-          <span className="ratio-value">{totalFocus}m</span>
+          <span className="ratio-value">{Number(totalFocus.toFixed(1))}m</span>
         </div>
         <div className="ratio-row">
           <span className="ratio-label">Break</span>
           <div className="ratio-track">
             <div className="ratio-fill ratio-break" style={{ width: `${Math.max(breakPct, totalBreak > 0 ? 3 : 0)}%` }} />
           </div>
-          <span className="ratio-value">{totalBreak}m</span>
+          <span className="ratio-value">{Number(totalBreak.toFixed(1))}m</span>
         </div>
       </div>
       <div className="ratio-summary">
@@ -499,7 +502,7 @@ function App() {
         <div className="hero-stats" aria-label="Session summary">
           <span>{completedTasks.length}</span>
           <p>tasks done</p>
-          <span>{totalFocusMinutes}</span>
+          <span>{Number(totalFocusMinutes.toFixed(1))}</span>
           <p>focus minutes</p>
           <span>{taskQueue.length}</span>
           <p>queued</p>
@@ -771,7 +774,7 @@ function App() {
 
             <div className="dashboard-metrics">
               <div><span>{completedTasks.length}</span><p>tasks done</p></div>
-              <div><span>{totalFocusMinutes}</span><p>focus minutes</p></div>
+              <div><span>{Number(totalFocusMinutes.toFixed(1))}</span><p>focus minutes</p></div>
               <div>
                 <span>{completedTasks.length ? (totalFocusMinutes / completedTasks.length).toFixed(1) : 0}</span>
                 <p>avg minutes</p>
