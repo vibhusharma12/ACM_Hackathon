@@ -95,7 +95,7 @@ function playCompletionChime() {
     });
     window.setTimeout(() => context.close(), 900);
   } catch {
-    // Some browsers block audio; the visual notification still handles feedback.
+    // Audio blocked — visual notification still works.
   }
 }
 
@@ -315,6 +315,7 @@ function App() {
     [taskQueue]
   );
 
+  /* Derived stats */
   const totalFocusMinutes = useMemo(
     () => completedTasks.reduce((sum, t) => sum + t.focusMinutes * t.sessions, 0),
     [completedTasks]
@@ -450,7 +451,8 @@ function App() {
     setTimerSeconds(focusSecs);
     setTotalTimerSeconds(focusSecs);
     setIsRunning(false);
-    setStatusMessage("Focus timer ready.");
+    setIsPostTaskBreak(false);
+    setStatusMessage("Focus timer ready. Hit Start when you are.");
     setWorkflowStep(4);
     setHasSuggestion(false);
     setSuggestion(EMPTY_SUGGESTION);
@@ -463,8 +465,21 @@ function App() {
     setTotalTimerSeconds(0);
     setMode("focus");
     setRemainingSessions(0);
+    setIsPostTaskBreak(false);
     setStatusMessage("Timer stopped.");
     setWorkflowStep(1);
+  }
+
+  function handleStartBreak() {
+    if (!activeTask) return;
+    const breakSecs = 5 * 60;
+    setMode("break");
+    setTimerSeconds(breakSecs);
+    setTotalTimerSeconds(breakSecs);
+    setIsRunning(true);
+    setIsPostTaskBreak(false);
+    setStatusMessage("5-minute break started.");
+    setWorkflowStep(5);
   }
 
   function updateSuggestion(key, value) {
@@ -478,22 +493,40 @@ function App() {
     setTotalTimerSeconds(0);
     setMode("focus");
     setRemainingSessions(0);
+    setIsPostTaskBreak(false);
     setStatusMessage("");
     setWorkflowStep(1);
   }
 
   function handleViewDashboard() { setWorkflowStep(6); }
 
+  // Called when user clicks "Start Break" / "Continue Break" on the notice modal
+  function handleDismissNotice() {
+    setSessionNotice(null);
+    if (isPostTaskBreak) {
+      setIsRunning(true);
+    }
+  }
+
+  /* ── Render ───────────────────────────────────────────────────────── */
   return (
     <main className="app-shell">
+
+      {/* Hero */}
       <section className="hero-panel">
         <div>
           <p className="eyebrow">Focus Flow</p>
           <h1>Plan the task, tune the session, start the timer.</h1>
           <div className="hero-actions">
-            <button onClick={handleViewDashboard}>View Dashboard</button>
+            <button id="btn-view-dashboard" onClick={handleViewDashboard}>
+              View Dashboard
+            </button>
             {activeTask && (
-              <button className="primary-action" onClick={() => setWorkflowStep(4)}>
+              <button
+                id="btn-back-to-timer"
+                className="primary-action"
+                onClick={() => setWorkflowStep(mode === "break" ? 5 : 4)}
+              >
                 Back To Timer
               </button>
             )}
@@ -509,6 +542,10 @@ function App() {
         </div>
       </section>
 
+      {/* Step indicator */}
+      <StepIndicator workflowStep={workflowStep} />
+
+      {/* Workflow panels */}
       <section className="stage-shell">
 
         {workflowStep === 1 && (
@@ -845,11 +882,17 @@ function App() {
         )}
       </section>
 
+      {/* Session / task-complete notice */}
       {sessionNotice && (
-        <div className="notice-backdrop" role="dialog" aria-modal="true">
+        <div
+          className="notice-backdrop"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="notice-title"
+        >
           <div className="notice-card">
             <p className="eyebrow">Congratulations</p>
-            <h2>{sessionNotice.title}</h2>
+            <h2 id="notice-title">{sessionNotice.title}</h2>
             <p>{sessionNotice.message}</p>
             <blockquote>{sessionNotice.quote}</blockquote>
             {prioritizedQueue.length > 0 && (

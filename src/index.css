@@ -435,7 +435,13 @@ h2 {
 /* ─── Task entry panel ───────────────────────────────────────────────── */
 .task-panel {
   display: grid;
-  gap: 14px;
+  gap: 16px;
+}
+
+/* ─── Suggestion panel ───────────────────────────────────────────────── */
+.suggestion-panel {
+  display: grid;
+  gap: 16px;
 }
 
 .plan-card {
