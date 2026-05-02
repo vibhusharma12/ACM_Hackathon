@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { daysUntil, parseLocalDate } from "./utils/dates";
 
 const EMPTY_SUGGESTION = {
   difficulty: "Medium",
   focusMinutes: 25,
   sessions: 2,
   breakMinutes: 15,
+  reason: "Plan generated from your task details.",
 };
 
 const FOCUS_QUOTES = [
@@ -20,33 +22,54 @@ function formatTime(totalSeconds) {
   return `${minutes}:${seconds}`;
 }
 
-function getTaskSuggestion(name, description) {
+function getDeadlineDateTime(deadline, deadlineTime) {
+  const date = parseLocalDate(deadline);
+  const [hours, minutes] = deadlineTime.split(":").map(Number);
+  date.setHours(hours, minutes, 0, 0);
+  return date;
+}
+
+function getTaskSuggestion(name, description, difficulty, deadline) {
   const text = `${name} ${description}`.toLowerCase();
   const hardWords = ["build", "project", "exam", "research", "design", "code"];
-  const easyWords = ["read", "reply", "email", "review", "clean", "call"];
-  const isHard = hardWords.some((word) => text.includes(word));
-  const isEasy = easyWords.some((word) => text.includes(word));
+  const needsExtraSession = hardWords.some((word) => text.includes(word));
   const wordCount = text.trim().split(/\s+/).filter(Boolean).length;
+  const daysLeft = daysUntil(deadline);
+  const urgencyBoost = daysLeft <= 1 ? 1 : daysLeft <= 3 ? 0 : -1;
+  const complexityBoost = needsExtraSession || wordCount > 16 ? 1 : 0;
 
-  if (isHard || wordCount > 16) {
+  if (difficulty === "Hard") {
     return {
-      difficulty: "Hard",
+      difficulty,
       focusMinutes: 50,
-      sessions: 3,
+      sessions: Math.max(2, Math.min(5, 3 + urgencyBoost + complexityBoost)),
       breakMinutes: 15,
     };
   }
 
-  if (isEasy || wordCount < 7) {
+  if (difficulty === "Easy") {
     return {
-      difficulty: "Easy",
+      difficulty,
       focusMinutes: 25,
-      sessions: 1,
+      sessions: Math.max(1, Math.min(3, 1 + urgencyBoost + complexityBoost)),
       breakMinutes: 10,
     };
   }
 
-  return EMPTY_SUGGESTION;
+  return {
+    difficulty,
+    focusMinutes: 35,
+    sessions: Math.max(1, Math.min(4, 2 + urgencyBoost + complexityBoost)),
+    breakMinutes: 15,
+  };
+}
+
+function getTodayInputValue() {
+  const today = new Date();
+  const year = today.getFullYear();
+  const month = String(today.getMonth() + 1).padStart(2, "0");
+  const day = String(today.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
 }
 
 function playCompletionChime() {
@@ -82,6 +105,9 @@ function playCompletionChime() {
 function App() {
   const [taskName, setTaskName] = useState("");
   const [taskDescription, setTaskDescription] = useState("");
+  const [taskDifficulty, setTaskDifficulty] = useState("Medium");
+  const [taskDeadline, setTaskDeadline] = useState("");
+  const [taskDeadlineTime, setTaskDeadlineTime] = useState("");
   const [suggestion, setSuggestion] = useState(EMPTY_SUGGESTION);
   const [hasSuggestion, setHasSuggestion] = useState(false);
   const [activeTask, setActiveTask] = useState(null);
@@ -93,6 +119,8 @@ function App() {
   const [statusMessage, setStatusMessage] = useState("");
   const [workflowStep, setWorkflowStep] = useState(1);
   const [sessionNotice, setSessionNotice] = useState(null);
+  const [isSuggesting, setIsSuggesting] = useState(false);
+  const todayInputValue = getTodayInputValue();
 
   const totalFocusMinutes = useMemo(
     () =>
@@ -172,16 +200,77 @@ function App() {
     return () => clearInterval(interval);
   }, [completeTimerSegment, isRunning, timerSeconds]);
 
-  function handleSuggest() {
+  async function handleSuggest() {
     const trimmedName = taskName.trim();
     if (!trimmedName) {
       setStatusMessage("Enter a task name first.");
       return;
     }
 
-    setSuggestion(getTaskSuggestion(trimmedName, taskDescription));
+    if (!taskDeadline) {
+      setStatusMessage("Add a deadline date so FocusFlow can plan the sessions.");
+      return;
+    }
+
+    if (daysUntil(taskDeadline) < 0) {
+      setStatusMessage("Deadline date cannot be before today.");
+      return;
+    }
+
+    if (!taskDeadlineTime) {
+      setStatusMessage("Add a deadline time for that date.");
+      return;
+    }
+
+    if (getDeadlineDateTime(taskDeadline, taskDeadlineTime) < new Date()) {
+      setStatusMessage("Deadline time cannot be in the past.");
+      return;
+    }
+
+    setIsSuggesting(true);
+    setStatusMessage("Generating AI plan...");
+
+    const localSuggestion = getTaskSuggestion(
+      trimmedName,
+      taskDescription,
+      taskDifficulty,
+      taskDeadline
+    );
+
+    try {
+      const response = await fetch("/api/suggest-plan", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          taskName: trimmedName,
+          taskDescription,
+          taskDifficulty,
+          taskDeadline,
+          taskDeadlineTime,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("AI server unavailable.");
+      }
+
+      const aiSuggestion = await response.json();
+      setSuggestion({
+        ...localSuggestion,
+        ...aiSuggestion,
+        difficulty: taskDifficulty,
+      });
+      setStatusMessage("AI suggestion ready. Adjust it before starting.");
+    } catch {
+      setSuggestion(localSuggestion);
+      setStatusMessage(
+        "Using local planner. Start the API server for real AI suggestions."
+      );
+    } finally {
+      setIsSuggesting(false);
+    }
+
     setHasSuggestion(true);
-    setStatusMessage("Suggestion ready. Adjust it before starting.");
     setWorkflowStep(2);
   }
 
@@ -193,6 +282,8 @@ function App() {
       id: crypto.randomUUID(),
       name: trimmedName,
       description: taskDescription.trim(),
+      deadline: taskDeadline,
+      deadlineTime: taskDeadlineTime,
       ...suggestion,
     };
 
@@ -205,6 +296,9 @@ function App() {
     setWorkflowStep(4);
     setTaskName("");
     setTaskDescription("");
+    setTaskDifficulty("Medium");
+    setTaskDeadline("");
+    setTaskDeadlineTime("");
     setHasSuggestion(false);
     setSuggestion(EMPTY_SUGGESTION);
   }
@@ -293,8 +387,43 @@ function App() {
             />
           </label>
 
+          <div className="control-grid">
+            <label>
+              Difficulty
+              <select
+                value={taskDifficulty}
+                onChange={(event) => setTaskDifficulty(event.target.value)}
+              >
+                <option>Easy</option>
+                <option>Medium</option>
+                <option>Hard</option>
+              </select>
+            </label>
+
+            <label>
+              Deadline
+              <input
+                type="date"
+                min={todayInputValue}
+                value={taskDeadline}
+                onChange={(event) => setTaskDeadline(event.target.value)}
+              />
+            </label>
+
+            <label>
+              Deadline time
+              <input
+                type="time"
+                value={taskDeadlineTime}
+                onChange={(event) => setTaskDeadlineTime(event.target.value)}
+              />
+            </label>
+          </div>
+
+          {statusMessage && <p className="status-line">{statusMessage}</p>}
+
           <button className="primary-action" onClick={handleSuggest}>
-            Get Suggestion
+            {isSuggesting ? "Generating..." : "Get Suggestion"}
           </button>
         </div>
         )}
@@ -331,6 +460,15 @@ function App() {
                     ? "complete this quickly before deeper work"
                     : "keep it steady and avoid switching tasks"}
               </li>
+              <li>
+                Deadline pressure:{" "}
+                {daysUntil(taskDeadline) <= 1
+                  ? "urgent"
+                  : daysUntil(taskDeadline) <= 3
+                    ? "soon"
+                    : "flexible"}
+              </li>
+              <li>Reason: {suggestion.reason}</li>
             </ul>
           </div>
 
@@ -346,6 +484,12 @@ function App() {
             <div>
               <span>Sessions</span>
               <strong>{suggestion.sessions}</strong>
+            </div>
+            <div>
+              <span>Deadline</span>
+              <strong>
+                {taskDeadline} at {taskDeadlineTime}
+              </strong>
             </div>
             <div>
               <span>Break</span>
