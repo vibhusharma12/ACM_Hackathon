@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import "./index.css";
 
 const EMPTY_SUGGESTION = {
   difficulty: "Medium",
@@ -7,6 +6,13 @@ const EMPTY_SUGGESTION = {
   sessions: 2,
   breakMinutes: 15,
 };
+
+const FOCUS_QUOTES = [
+  "Small wins compound into serious momentum.",
+  "The best work is built one focused block at a time.",
+  "Progress gets easier when you protect your attention.",
+  "You showed up, stayed with it, and moved the task forward.",
+];
 
 function formatTime(totalSeconds) {
   const minutes = Math.floor(totalSeconds / 60);
@@ -43,6 +49,36 @@ function getTaskSuggestion(name, description) {
   return EMPTY_SUGGESTION;
 }
 
+function playCompletionChime() {
+  try {
+    const AudioContext = window.AudioContext || window.webkitAudioContext;
+    if (!AudioContext) return;
+
+    const context = new AudioContext();
+    const gain = context.createGain();
+    gain.connect(context.destination);
+    gain.gain.setValueAtTime(0.0001, context.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.18, context.currentTime + 0.02);
+    gain.gain.exponentialRampToValueAtTime(0.0001, context.currentTime + 0.7);
+
+    [660, 880].forEach((frequency, index) => {
+      const oscillator = context.createOscillator();
+      oscillator.type = "sine";
+      oscillator.frequency.setValueAtTime(
+        frequency,
+        context.currentTime + index * 0.16
+      );
+      oscillator.connect(gain);
+      oscillator.start(context.currentTime + index * 0.16);
+      oscillator.stop(context.currentTime + index * 0.16 + 0.22);
+    });
+
+    window.setTimeout(() => context.close(), 900);
+  } catch {
+    // Some browsers block audio; the visual notification still handles feedback.
+  }
+}
+
 function App() {
   const [taskName, setTaskName] = useState("");
   const [taskDescription, setTaskDescription] = useState("");
@@ -55,6 +91,8 @@ function App() {
   const [remainingSessions, setRemainingSessions] = useState(0);
   const [completedTasks, setCompletedTasks] = useState([]);
   const [statusMessage, setStatusMessage] = useState("");
+  const [workflowStep, setWorkflowStep] = useState(1);
+  const [sessionNotice, setSessionNotice] = useState(null);
 
   const totalFocusMinutes = useMemo(
     () =>
@@ -65,40 +103,57 @@ function App() {
     [completedTasks]
   );
 
-  const activeStep = activeTask ? (mode === "break" ? 5 : 4) : hasSuggestion ? 3 : 1;
-
   const completeTimerSegment = useCallback(() => {
     if (!activeTask) return;
     setIsRunning(false);
 
     if (mode === "focus") {
-      setStatusMessage("Focus session complete. Break timer is ready.");
+      const nextSessions = remainingSessions - 1;
+      const quote =
+        FOCUS_QUOTES[(completedTasks.length + remainingSessions) % FOCUS_QUOTES.length];
+
+      playCompletionChime();
+
+      if (nextSessions <= 0) {
+        setSessionNotice({
+          title: "Task complete!",
+          message: `Great work. You completed ${activeTask.name}.`,
+          quote,
+        });
+        setCompletedTasks((tasks) => [
+          {
+            ...activeTask,
+            completedAt: new Date().toISOString(),
+          },
+          ...tasks,
+        ]);
+        setStatusMessage("Task complete. Dashboard updated.");
+        setActiveTask(null);
+        setRemainingSessions(0);
+        setMode("focus");
+        setWorkflowStep(6);
+        return;
+      }
+
+      setSessionNotice({
+        title: "Session complete!",
+        message: `Great work on ${activeTask.name}. Your break has started automatically.`,
+        quote,
+      });
+      setStatusMessage("Focus session complete. Break timer started automatically.");
+      setRemainingSessions(nextSessions);
       setMode("break");
       setTimerSeconds(activeTask.breakMinutes * 60);
+      setIsRunning(true);
+      setWorkflowStep(5);
       return;
     }
 
-    const nextSessions = remainingSessions - 1;
-    setRemainingSessions(nextSessions);
-
-    if (nextSessions > 0) {
-      setStatusMessage("Break complete. Next focus session is ready.");
-      setMode("focus");
-      setTimerSeconds(activeTask.focusMinutes * 60);
-      return;
-    }
-
-    setCompletedTasks((tasks) => [
-      {
-        ...activeTask,
-        completedAt: new Date().toISOString(),
-      },
-      ...tasks,
-    ]);
-    setStatusMessage("Task complete. Dashboard updated.");
-    setActiveTask(null);
+    setStatusMessage("Break complete. Next focus session is ready.");
     setMode("focus");
-  }, [activeTask, mode, remainingSessions]);
+    setTimerSeconds(activeTask.focusMinutes * 60);
+    setWorkflowStep(4);
+  }, [activeTask, completedTasks.length, mode, remainingSessions]);
 
   useEffect(() => {
     if (!isRunning || timerSeconds <= 0) return;
@@ -127,6 +182,7 @@ function App() {
     setSuggestion(getTaskSuggestion(trimmedName, taskDescription));
     setHasSuggestion(true);
     setStatusMessage("Suggestion ready. Adjust it before starting.");
+    setWorkflowStep(2);
   }
 
   function handleStart() {
@@ -146,6 +202,7 @@ function App() {
     setTimerSeconds(task.focusMinutes * 60);
     setIsRunning(false);
     setStatusMessage("Focus timer ready.");
+    setWorkflowStep(4);
     setTaskName("");
     setTaskDescription("");
     setHasSuggestion(false);
@@ -159,6 +216,7 @@ function App() {
     setMode("focus");
     setRemainingSessions(0);
     setStatusMessage("Timer stopped.");
+    setWorkflowStep(1);
   }
 
   function updateSuggestion(key, value) {
@@ -168,12 +226,34 @@ function App() {
     }));
   }
 
+  function handleNewTask() {
+    setActiveTask(null);
+    setIsRunning(false);
+    setTimerSeconds(0);
+    setMode("focus");
+    setRemainingSessions(0);
+    setStatusMessage("");
+    setWorkflowStep(1);
+  }
+
+  function handleViewDashboard() {
+    setWorkflowStep(6);
+  }
+
   return (
     <main className="app-shell">
       <section className="hero-panel">
         <div>
           <p className="eyebrow">FocusFlow</p>
           <h1>Plan the task, tune the session, start the timer.</h1>
+          <div className="hero-actions">
+            <button onClick={handleViewDashboard}>View Dashboard</button>
+            {activeTask && (
+              <button className="primary-action" onClick={() => setWorkflowStep(4)}>
+                Back To Timer
+              </button>
+            )}
+          </div>
         </div>
         <div className="hero-stats" aria-label="Session summary">
           <span>{completedTasks.length}</span>
@@ -183,10 +263,10 @@ function App() {
         </div>
       </section>
 
-      <section className="workspace-grid">
-        <div className="panel task-panel">
+      <section className="stage-shell">
+        {workflowStep === 1 && (
+        <div className="panel task-panel stage-panel">
           <div className="panel-heading">
-            <span className="step-pill">1</span>
             <div>
               <h2>Enter Task</h2>
               <p>Type the task and any useful context.</p>
@@ -217,14 +297,41 @@ function App() {
             Get Suggestion
           </button>
         </div>
+        )}
 
-        <div className="panel suggestion-panel">
+        {workflowStep === 2 && (
+        <div className="panel suggestion-panel stage-panel">
           <div className="panel-heading">
-            <span className="step-pill">2</span>
             <div>
               <h2>AI Suggests</h2>
-              <p>Difficulty, focus time, sessions, and break length.</p>
+              <p>Structured plan generated from your task details.</p>
             </div>
+          </div>
+
+          <div className="plan-card">
+            <div>
+              <span>Plan</span>
+              <strong>
+                {suggestion.sessions} focus session
+                {suggestion.sessions === 1 ? "" : "s"} for a{" "}
+                {suggestion.difficulty.toLowerCase()} task
+              </strong>
+            </div>
+            <ul>
+              <li>Total workload: {suggestion.sessions} sessions</li>
+              <li>
+                Focus rhythm: {suggestion.focusMinutes} min work +{" "}
+                {suggestion.breakMinutes} min break
+              </li>
+              <li>
+                Recommendation:{" "}
+                {suggestion.difficulty === "Hard"
+                  ? "start this while your energy is highest"
+                  : suggestion.difficulty === "Easy"
+                    ? "complete this quickly before deeper work"
+                    : "keep it steady and avoid switching tasks"}
+              </li>
+            </ul>
           </div>
 
           <div className="suggestion-grid">
@@ -245,11 +352,19 @@ function App() {
               <strong>{suggestion.breakMinutes} min</strong>
             </div>
           </div>
-        </div>
 
-        <div className="panel adjust-panel">
+          <div className="stage-actions">
+            <button onClick={() => setWorkflowStep(1)}>Edit Task</button>
+            <button className="primary-action" onClick={() => setWorkflowStep(3)}>
+              Adjust Plan
+            </button>
+          </div>
+        </div>
+        )}
+
+        {workflowStep === 3 && (
+        <div className="panel adjust-panel stage-panel">
           <div className="panel-heading">
-            <span className="step-pill">3</span>
             <div>
               <h2>User Adjusts</h2>
               <p>Change the plan before starting.</p>
@@ -319,10 +434,11 @@ function App() {
             Confirm To Start
           </button>
         </div>
+        )}
 
-        <div className="panel timer-panel">
+        {(workflowStep === 4 || workflowStep === 5) && (
+        <div className="panel timer-panel stage-panel">
           <div className="panel-heading">
-            <span className="step-pill">{mode === "break" ? "5" : "4"}</span>
             <div>
               <h2>{mode === "break" ? "Break Timer" : "Focus Timer"}</h2>
               <p>
@@ -362,10 +478,11 @@ function App() {
 
           {statusMessage && <p className="status-line">{statusMessage}</p>}
         </div>
+        )}
 
-        <div className="panel dashboard-panel">
+        {workflowStep === 6 && (
+        <div className="panel dashboard-panel stage-panel">
           <div className="panel-heading">
-            <span className="step-pill">6</span>
             <div>
               <h2>Dashboard</h2>
               <p>Summary and a simple focus tip.</p>
@@ -406,22 +523,37 @@ function App() {
               </article>
             ))}
           </div>
-        </div>
-      </section>
 
-      <section className="flow-map" aria-label="Flow progress">
-        {["Task Input", "AI Call", "Adjust", "Timer", "Break", "Dashboard"].map(
-          (label, index) => (
-            <div
-              className={activeStep >= index + 1 ? "flow-step active" : "flow-step"}
-              key={label}
-            >
-              <span>{index + 1}</span>
-              <p>{label}</p>
-            </div>
-          )
+          <div className="stage-actions">
+            {activeTask && (
+              <button onClick={() => setWorkflowStep(mode === "break" ? 5 : 4)}>
+                Back To Timer
+              </button>
+            )}
+            <button className="primary-action" onClick={handleNewTask}>
+              Plan Next Task
+            </button>
+          </div>
+        </div>
         )}
       </section>
+
+      {sessionNotice && (
+        <div className="notice-backdrop" role="dialog" aria-modal="true">
+          <div className="notice-card">
+            <p className="eyebrow">Congratulations</p>
+            <h2>{sessionNotice.title}</h2>
+            <p>{sessionNotice.message}</p>
+            <blockquote>{sessionNotice.quote}</blockquote>
+            <button
+              className="primary-action"
+              onClick={() => setSessionNotice(null)}
+            >
+              Continue Break
+            </button>
+          </div>
+        </div>
+      )}
     </main>
   );
 }
