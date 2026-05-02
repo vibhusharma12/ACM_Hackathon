@@ -1,12 +1,17 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { daysUntil, parseLocalDate } from "./utils/dates";
 
+/* ─── Constants ─────────────────────────────────────────────────────── */
 const EMPTY_SUGGESTION = {
   difficulty: "Medium",
   focusMinutes: 25,
   sessions: 2,
+<<<<<<< HEAD
   breakMinutes: 15,
   reason: "Plan generated from your task details.",
+=======
+  breakMinutes: 5,
+>>>>>>> 8398810 (my local changes)
 };
 
 const FOCUS_QUOTES = [
@@ -31,12 +36,20 @@ function getPriorityLabel(score) {
   return { label: "Low", cls: "priority-low" };
 }
 
+const STEPS = ["Task", "Plan", "Adjust", "Timer", "Done"];
+const STEP_MAP = { 1: 0, 2: 1, 3: 2, 4: 3, 5: 3, 6: 4 };
+
+const RING_R = 88;
+const RING_C = 2 * Math.PI * RING_R; // circumference
+
+/* ─── Helpers ───────────────────────────────────────────────────────── */
 function formatTime(totalSeconds) {
   const minutes = Math.floor(totalSeconds / 60);
   const seconds = String(totalSeconds % 60).padStart(2, "0");
   return `${minutes}:${seconds}`;
 }
 
+<<<<<<< HEAD
 function getDeadlineDateTime(deadline, deadlineTime) {
   const date = parseLocalDate(deadline);
   const [hours, minutes] = deadlineTime.split(":").map(Number);
@@ -48,11 +61,26 @@ function getTaskSuggestion(name, description, difficulty, deadline) {
   const text = `${name} ${description}`.toLowerCase();
   const hardWords = ["build", "project", "exam", "research", "design", "code"];
   const needsExtraSession = hardWords.some((word) => text.includes(word));
+=======
+function formatDate(iso) {
+  if (!iso) return "";
+  const d = new Date(iso);
+  return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+}
+
+function getTaskSuggestion(name, description) {
+  const text = `${name} ${description}`.toLowerCase();
+  const hardWords = ["build", "project", "exam", "research", "design", "code"];
+  const easyWords = ["read", "reply", "email", "review", "clean", "call"];
+  const isHard = hardWords.some((w) => text.includes(w));
+  const isEasy = easyWords.some((w) => text.includes(w));
+>>>>>>> 8398810 (my local changes)
   const wordCount = text.trim().split(/\s+/).filter(Boolean).length;
   const daysLeft = daysUntil(deadline);
   const urgencyBoost = daysLeft <= 1 ? 1 : daysLeft <= 3 ? 0 : -1;
   const complexityBoost = needsExtraSession || wordCount > 16 ? 1 : 0;
 
+<<<<<<< HEAD
   if (difficulty === "Hard") {
     return { difficulty, focusMinutes: 50, sessions: Math.max(2, Math.min(5, 3 + urgencyBoost + complexityBoost)), breakMinutes: 15 };
   }
@@ -68,33 +96,46 @@ function getTodayInputValue() {
   const month = String(today.getMonth() + 1).padStart(2, "0");
   const day = String(today.getDate()).padStart(2, "0");
   return `${year}-${month}-${day}`;
+=======
+  if (isHard || wordCount > 16) {
+    return { difficulty: "Hard", focusMinutes: 50, sessions: 3, breakMinutes: 5 };
+  }
+  if (isEasy || wordCount < 7) {
+    return { difficulty: "Easy", focusMinutes: 25, sessions: 1, breakMinutes: 5 };
+  }
+  return EMPTY_SUGGESTION;
+>>>>>>> 8398810 (my local changes)
 }
 
 function playCompletionChime() {
   try {
     const AudioContext = window.AudioContext || window.webkitAudioContext;
     if (!AudioContext) return;
+
     const context = new AudioContext();
     const gain = context.createGain();
     gain.connect(context.destination);
     gain.gain.setValueAtTime(0.0001, context.currentTime);
     gain.gain.exponentialRampToValueAtTime(0.18, context.currentTime + 0.02);
     gain.gain.exponentialRampToValueAtTime(0.0001, context.currentTime + 0.7);
+
     [660, 880].forEach((frequency, index) => {
       const oscillator = context.createOscillator();
       oscillator.type = "sine";
-      oscillator.frequency.setValueAtTime(frequency, context.currentTime + index * 0.16);
+      oscillator.frequency.setValueAtTime(
+        frequency,
+        context.currentTime + index * 0.16
+      );
       oscillator.connect(gain);
       oscillator.start(context.currentTime + index * 0.16);
       oscillator.stop(context.currentTime + index * 0.16 + 0.22);
     });
+
     window.setTimeout(() => context.close(), 900);
   } catch {
     // Some browsers block audio; the visual notification still handles feedback.
   }
 }
-
-const EMPTY_FORM = { name: "", description: "", difficulty: "Medium", deadline: "", deadlineTime: "" };
 
 function App() {
   const [taskForm, setTaskForm] = useState(EMPTY_FORM);
@@ -104,6 +145,7 @@ function App() {
   const [hasSuggestion, setHasSuggestion] = useState(false);
   const [activeTask, setActiveTask] = useState(null);
   const [timerSeconds, setTimerSeconds] = useState(0);
+  const [totalTimerSeconds, setTotalTimerSeconds] = useState(0);
   const [isRunning, setIsRunning] = useState(false);
   const [mode, setMode] = useState("focus");
   const [remainingSessions, setRemainingSessions] = useState(0);
@@ -111,22 +153,21 @@ function App() {
   const [statusMessage, setStatusMessage] = useState("");
   const [workflowStep, setWorkflowStep] = useState(1);
   const [sessionNotice, setSessionNotice] = useState(null);
+<<<<<<< HEAD
   const [isSuggesting, setIsSuggesting] = useState(false);
 
   const todayInputValue = getTodayInputValue();
-
-  const prioritizedQueue = useMemo(
-    () =>
-      [...taskQueue].sort(
-        (a, b) =>
-          getPriorityScore(b.difficulty, b.deadline) -
-          getPriorityScore(a.difficulty, a.deadline)
-      ),
-    [taskQueue]
-  );
+=======
+  // tracks whether the current break is a post-task break (go to dashboard when done)
+  const [isPostTaskBreak, setIsPostTaskBreak] = useState(false);
+>>>>>>> 8398810 (my local changes)
 
   const totalFocusMinutes = useMemo(
-    () => completedTasks.reduce((sum, t) => sum + t.focusMinutes * t.sessions, 0),
+    () =>
+      completedTasks.reduce(
+        (sum, task) => sum + task.focusMinutes * task.sessions,
+        0
+      ),
     [completedTasks]
   );
 
@@ -190,98 +231,231 @@ function App() {
     setHasSuggestion(true);
   }
 
+  /* Timer ring progress (1.0 → 0.0 as timer counts down) */
+  const timerProgress = totalTimerSeconds > 0 ? timerSeconds / totalTimerSeconds : 0;
+  const ringOffset = RING_C * (1 - timerProgress);
+
+  /* ── completeTimerSegment ─────────────────────────────────────────── */
   const completeTimerSegment = useCallback(() => {
     if (!activeTask) return;
     setIsRunning(false);
 
     if (mode === "focus") {
       const nextSessions = remainingSessions - 1;
-      const quote = FOCUS_QUOTES[(completedTasks.length + remainingSessions) % FOCUS_QUOTES.length];
+      const quote =
+        FOCUS_QUOTES[(completedTasks.length + remainingSessions) % FOCUS_QUOTES.length];
+
       playCompletionChime();
 
       if (nextSessions <= 0) {
-        setSessionNotice({ title: "Task complete!", message: `Great work. You completed ${activeTask.name}.`, quote });
-        setCompletedTasks((tasks) => [{ ...activeTask, completedAt: new Date().toISOString() }, ...tasks]);
+        setSessionNotice({
+          title: "Task complete!",
+          message: `Great work. You completed ${activeTask.name}.`,
+          quote,
+        });
+        setCompletedTasks((tasks) => [
+          {
+            ...activeTask,
+            completedAt: new Date().toISOString(),
+          },
+          ...tasks,
+        ]);
         setStatusMessage("Task complete. Dashboard updated.");
         setActiveTask(null);
         setRemainingSessions(0);
         setMode("focus");
-        setWorkflowStep(prioritizedQueue.length > 0 ? 1 : 6);
+        setWorkflowStep(6);
         return;
       }
 
       setSessionNotice({
         title: "Session complete!",
-        message: `Great work on ${activeTask.name}. Break has started automatically.`,
+        message: `Great work on ${activeTask.name}. Your break has started automatically.`,
         quote,
       });
       setStatusMessage("Focus session complete. Break timer started.");
       setRemainingSessions(nextSessions);
       setMode("break");
-      setTimerSeconds(activeTask.breakMinutes * 60);
+      const interBreakSecs = activeTask.breakMinutes * 60;
+      setTimerSeconds(interBreakSecs);
+      setTotalTimerSeconds(interBreakSecs);
       setIsRunning(true);
       setWorkflowStep(5);
       return;
     }
 
-    setStatusMessage("Break complete. Next focus session ready.");
+    setStatusMessage("Break complete. Next focus session is ready.");
     setMode("focus");
     setTimerSeconds(activeTask.focusMinutes * 60);
     setWorkflowStep(4);
-  }, [activeTask, completedTasks.length, mode, remainingSessions, prioritizedQueue.length]);
+  }, [activeTask, completedTasks.length, mode, remainingSessions]);
 
   useEffect(() => {
     if (!isRunning || timerSeconds <= 0) return;
+
     const interval = setInterval(() => {
       setTimerSeconds((seconds) => {
-        if (seconds <= 1) { window.setTimeout(completeTimerSegment, 0); return 0; }
+        if (seconds <= 1) {
+          window.setTimeout(completeTimerSegment, 0);
+          return 0;
+        }
+
         return seconds - 1;
       });
     }, 1000);
+
     return () => clearInterval(interval);
   }, [completeTimerSegment, isRunning, timerSeconds]);
 
+  async function handleSuggest() {
+    const trimmedName = taskName.trim();
+    if (!trimmedName) {
+      setStatusMessage("Enter a task name first.");
+      return;
+    }
+
+    if (!taskDeadline) {
+      setStatusMessage("Add a deadline date so FocusFlow can plan the sessions.");
+      return;
+    }
+
+    if (daysUntil(taskDeadline) < 0) {
+      setStatusMessage("Deadline date cannot be before today.");
+      return;
+    }
+
+    if (!taskDeadlineTime) {
+      setStatusMessage("Add a deadline time for that date.");
+      return;
+    }
+
+    if (getDeadlineDateTime(taskDeadline, taskDeadlineTime) < new Date()) {
+      setStatusMessage("Deadline time cannot be in the past.");
+      return;
+    }
+
+    setIsSuggesting(true);
+    setStatusMessage("Generating AI plan...");
+
+    const localSuggestion = getTaskSuggestion(
+      trimmedName,
+      taskDescription,
+      taskDifficulty,
+      taskDeadline
+    );
+
+    try {
+      const response = await fetch("/api/suggest-plan", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          taskName: trimmedName,
+          taskDescription,
+          taskDifficulty,
+          taskDeadline,
+          taskDeadlineTime,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("AI server unavailable.");
+      }
+
+      const aiSuggestion = await response.json();
+      setSuggestion({
+        ...localSuggestion,
+        ...aiSuggestion,
+        difficulty: taskDifficulty,
+      });
+      setStatusMessage("AI suggestion ready. Adjust it before starting.");
+    } catch {
+      setSuggestion(localSuggestion);
+      setStatusMessage(
+        "Using local planner. Start the API server for real AI suggestions."
+      );
+    } finally {
+      setIsSuggesting(false);
+    }
+
+    setHasSuggestion(true);
+    setWorkflowStep(2);
+  }
+
   function handleStart() {
-    if (!planningTask) return;
-    const task = { ...planningTask, ...suggestion };
+    const trimmedName = taskName.trim();
+    if (!trimmedName) return;
+
+    const task = {
+      id: crypto.randomUUID(),
+      name: trimmedName,
+      description: taskDescription.trim(),
+      deadline: taskDeadline,
+      deadlineTime: taskDeadlineTime,
+      ...suggestion,
+    };
+
     setActiveTask(task);
-    setTaskQueue((q) => q.filter((t) => t.id !== planningTask.id));
-    setPlanningTask(null);
     setRemainingSessions(task.sessions);
     setMode("focus");
     setTimerSeconds(task.focusMinutes * 60);
     setIsRunning(false);
     setStatusMessage("Focus timer ready.");
     setWorkflowStep(4);
+    setTaskName("");
+    setTaskDescription("");
+    setTaskDifficulty("Medium");
+    setTaskDeadline("");
+    setTaskDeadlineTime("");
     setHasSuggestion(false);
     setSuggestion(EMPTY_SUGGESTION);
   }
 
-  function handleStopTask() {
-    setActiveTask(null);
-    setIsRunning(false);
-    setTimerSeconds(0);
-    setMode("focus");
-    setRemainingSessions(0);
-    setStatusMessage("Timer stopped.");
-    setWorkflowStep(1);
-  }
+    function handleStopTask() {
+      setActiveTask(null);
+      setIsRunning(false);
+      setTimerSeconds(0);
+      setTotalTimerSeconds(0);
+      setMode("focus");
+      setRemainingSessions(0);
+      setIsPostTaskBreak(false);
+      setStatusMessage("Timer stopped.");
+      setWorkflowStep(1);
+    }
+
+    function handleStartBreak() {
+      if (!activeTask) return;
+      const breakSecs = 5 * 60;
+      setMode("break");
+      setTimerSeconds(breakSecs);
+      setTotalTimerSeconds(breakSecs);
+      setIsRunning(true);
+      setIsPostTaskBreak(false);
+      setStatusMessage("5-minute break started.");
+      setWorkflowStep(5);
+    }
 
   function updateSuggestion(key, value) {
-    setSuggestion((current) => ({ ...current, [key]: key === "difficulty" ? value : Number(value) }));
+    setSuggestion((current) => ({
+      ...current,
+      [key]: key === "difficulty" ? value : Number(value),
+    }));
   }
 
-  function handleNewTask() {
-    setActiveTask(null);
-    setIsRunning(false);
-    setTimerSeconds(0);
-    setMode("focus");
-    setRemainingSessions(0);
-    setStatusMessage("");
-    setWorkflowStep(1);
-  }
+    function handleNewTask() {
+      setActiveTask(null);
+      setIsRunning(false);
+      setTimerSeconds(0);
+      setTotalTimerSeconds(0);
+      setMode("focus");
+      setRemainingSessions(0);
+      setIsPostTaskBreak(false);
+      setStatusMessage("");
+      setWorkflowStep(1);
+    }
 
-  function handleViewDashboard() { setWorkflowStep(6); }
+  function handleViewDashboard() {
+    setWorkflowStep(6);
+  }
 
   return (
     <main className="app-shell">
@@ -303,33 +477,28 @@ function App() {
           <p>tasks done</p>
           <span>{totalFocusMinutes}</span>
           <p>focus minutes</p>
-          <span>{taskQueue.length}</span>
-          <p>queued</p>
         </div>
       </section>
 
       <section className="stage-shell">
         {workflowStep === 1 && (
-          <div className="panel task-panel stage-panel">
-            <div className="panel-heading">
-              <div>
-                <h2>Task Queue</h2>
-                <p>Add all your tasks — FocusFlow will rank them by priority.</p>
-              </div>
+        <div className="panel task-panel stage-panel">
+          <div className="panel-heading">
+            <div>
+              <h2>Enter Task</h2>
+              <p>Type the task and any useful context.</p>
             </div>
+          </div>
 
-            {/* Add task form */}
-            <div className="add-task-form">
-              <label>
-                Task name
-                <input
-                  type="text"
-                  value={taskForm.name}
-                  onChange={(e) => updateForm("name", e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && handleAddToQueue()}
-                  placeholder="Prepare database notes"
-                />
-              </label>
+          <label>
+            Task name
+            <input
+              type="text"
+              value={taskName}
+              onChange={(event) => setTaskName(event.target.value)}
+              placeholder="Prepare database notes"
+            />
+          </label>
 
               <label>
                 Description
@@ -360,264 +529,265 @@ function App() {
                 </label>
               </div>
 
-              {statusMessage && <p className="status-line">{statusMessage}</p>}
+          {statusMessage && <p className="status-line">{statusMessage}</p>}
 
-              <button className="primary-action" onClick={handleAddToQueue}>
-                + Add to Queue
-              </button>
-            </div>
-
-            {/* Priority Queue */}
-            {prioritizedQueue.length > 0 && (
-              <div className="queue-section">
-                <p className="queue-label">Priority Queue — {prioritizedQueue.length} task{prioritizedQueue.length !== 1 ? "s" : ""}</p>
-                <div className="queue-list">
-                  {prioritizedQueue.map((task, index) => {
-                    const score = getPriorityScore(task.difficulty, task.deadline);
-                    const { label, cls } = getPriorityLabel(score);
-                    const days = Math.round(daysUntil(task.deadline));
-                    return (
-                      <div key={task.id} className="queue-item">
-                        <div className="queue-rank">#{index + 1}</div>
-                        <div className="queue-info">
-                          <div className="queue-top">
-                            <strong>{task.name}</strong>
-                            <span className={`priority-badge ${cls}`}>{label}</span>
-                          </div>
-                          <div className="queue-meta">
-                            <span>{task.difficulty}</span>
-                            <span>·</span>
-                            <span>{days === 0 ? "Due today" : days === 1 ? "Due tomorrow" : `${days}d left`}</span>
-                            {task.description && <><span>·</span><span className="queue-desc">{task.description}</span></>}
-                          </div>
-                        </div>
-                        <div className="queue-actions">
-                          <button
-                            className="primary-action plan-btn"
-                            onClick={() => handlePlanTask(task)}
-                            disabled={isSuggesting}
-                          >
-                            Plan
-                          </button>
-                          <button className="remove-btn" onClick={() => handleRemoveFromQueue(task.id)} title="Remove task">✕</button>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-          </div>
+          <button className="primary-action" onClick={handleSuggest}>
+            {isSuggesting ? "Generating..." : "Get Suggestion"}
+          </button>
+        </div>
         )}
 
-        {workflowStep === 2 && planningTask && (
-          <div className="panel suggestion-panel stage-panel">
-            <div className="panel-heading">
-              <div>
-                <h2>AI Suggests</h2>
-                <p>Structured plan generated for <strong>{planningTask.name}</strong>.</p>
-              </div>
+        {workflowStep === 2 && (
+        <div className="panel suggestion-panel stage-panel">
+          <div className="panel-heading">
+            <div>
+              <h2>AI Suggests</h2>
+              <p>Structured plan generated from your task details.</p>
             </div>
-
-            {isSuggesting ? (
-              <div className="generating-state">
-                <div className="spinner" />
-                <p>Generating your focus plan…</p>
-              </div>
-            ) : (
-              <>
-                <div className="plan-card">
-                  <div>
-                    <span>Plan</span>
-                    <strong>
-                      {suggestion.sessions} focus session{suggestion.sessions === 1 ? "" : "s"} for a{" "}
-                      {suggestion.difficulty.toLowerCase()} task
-                    </strong>
-                  </div>
-                  <ul>
-                    <li>Total workload: {suggestion.sessions} sessions</li>
-                    <li>Focus rhythm: {suggestion.focusMinutes} min work + {suggestion.breakMinutes} min break</li>
-                    <li>
-                      Recommendation:{" "}
-                      {suggestion.difficulty === "Hard"
-                        ? "start this while your energy is highest"
-                        : suggestion.difficulty === "Easy"
-                        ? "complete this quickly before deeper work"
-                        : "keep it steady and avoid switching tasks"}
-                    </li>
-                    <li>
-                      Deadline pressure:{" "}
-                      {daysUntil(planningTask.deadline) <= 1 ? "urgent" : daysUntil(planningTask.deadline) <= 3 ? "soon" : "flexible"}
-                    </li>
-                    <li>Reason: {suggestion.reason}</li>
-                  </ul>
-                </div>
-
-                <div className="suggestion-grid">
-                  <div><span>Difficulty</span><strong>{suggestion.difficulty}</strong></div>
-                  <div><span>Focus</span><strong>{suggestion.focusMinutes} min</strong></div>
-                  <div><span>Sessions</span><strong>{suggestion.sessions}</strong></div>
-                  <div><span>Deadline</span><strong>{planningTask.deadline} at {planningTask.deadlineTime}</strong></div>
-                  <div><span>Break</span><strong>{suggestion.breakMinutes} min</strong></div>
-                </div>
-
-                {statusMessage && <p className="status-line">{statusMessage}</p>}
-
-                <div className="stage-actions">
-                  <button onClick={() => setWorkflowStep(1)}>Back to Queue</button>
-                  <button className="primary-action" onClick={() => setWorkflowStep(3)}>
-                    Adjust Plan
-                  </button>
-                </div>
-              </>
-            )}
           </div>
+
+          <div className="plan-card">
+            <div>
+              <span>Plan</span>
+              <strong>
+                {suggestion.sessions} focus session
+                {suggestion.sessions === 1 ? "" : "s"} for a{" "}
+                {suggestion.difficulty.toLowerCase()} task
+              </strong>
+            </div>
+            <ul>
+              <li>Total workload: {suggestion.sessions} sessions</li>
+              <li>
+                Focus rhythm: {suggestion.focusMinutes} min work +{" "}
+                {suggestion.breakMinutes} min break
+              </li>
+              <li>
+                Recommendation:{" "}
+                {suggestion.difficulty === "Hard"
+                  ? "start this while your energy is highest"
+                  : suggestion.difficulty === "Easy"
+                    ? "complete this quickly before deeper work"
+                    : "keep it steady and avoid switching tasks"}
+              </li>
+              <li>
+                Deadline pressure:{" "}
+                {daysUntil(taskDeadline) <= 1
+                  ? "urgent"
+                  : daysUntil(taskDeadline) <= 3
+                    ? "soon"
+                    : "flexible"}
+              </li>
+              <li>Reason: {suggestion.reason}</li>
+            </ul>
+          </div>
+
+          <div className="suggestion-grid">
+            <div>
+              <span>Difficulty</span>
+              <strong>{suggestion.difficulty}</strong>
+            </div>
+            <div>
+              <span>Focus</span>
+              <strong>{suggestion.focusMinutes} min</strong>
+            </div>
+            <div>
+              <span>Sessions</span>
+              <strong>{suggestion.sessions}</strong>
+            </div>
+            <div>
+              <span>Deadline</span>
+              <strong>
+                {taskDeadline} at {taskDeadlineTime}
+              </strong>
+            </div>
+            <div>
+              <span>Break</span>
+              <strong>{suggestion.breakMinutes} min</strong>
+            </div>
+          </div>
+
+          <div className="stage-actions">
+            <button onClick={() => setWorkflowStep(1)}>Edit Task</button>
+            <button className="primary-action" onClick={() => setWorkflowStep(3)}>
+              Adjust Plan
+            </button>
+          </div>
+        </div>
         )}
 
         {workflowStep === 3 && (
-          <div className="panel adjust-panel stage-panel">
-            <div className="panel-heading">
-              <div>
-                <h2>User Adjusts</h2>
-                <p>Change the plan before starting.</p>
-              </div>
-            </div>
-
-            <div className="control-grid">
-              <label>
-                Difficulty
-                <select value={suggestion.difficulty} onChange={(e) => updateSuggestion("difficulty", e.target.value)}>
-                  <option>Easy</option>
-                  <option>Medium</option>
-                  <option>Hard</option>
-                </select>
-              </label>
-              <label>
-                Focus minutes
-                <input type="number" min="5" max="90" value={suggestion.focusMinutes} onChange={(e) => updateSuggestion("focusMinutes", e.target.value)} />
-              </label>
-              <label>
-                Sessions
-                <input type="number" min="1" max="8" value={suggestion.sessions} onChange={(e) => updateSuggestion("sessions", e.target.value)} />
-              </label>
-              <label>
-                Break minutes
-                <input type="number" min="1" max="45" value={suggestion.breakMinutes} onChange={(e) => updateSuggestion("breakMinutes", e.target.value)} />
-              </label>
-            </div>
-
-            <div className="stage-actions">
-              <button onClick={() => setWorkflowStep(2)}>Back</button>
-              <button className="primary-action" onClick={handleStart} disabled={!hasSuggestion}>
-                Confirm & Start
-              </button>
+        <div className="panel adjust-panel stage-panel">
+          <div className="panel-heading">
+            <div>
+              <h2>User Adjusts</h2>
+              <p>Change the plan before starting.</p>
             </div>
           </div>
+
+          <div className="control-grid">
+            <label>
+              Difficulty
+              <select
+                value={suggestion.difficulty}
+                onChange={(event) =>
+                  updateSuggestion("difficulty", event.target.value)
+                }
+              >
+                <option>Easy</option>
+                <option>Medium</option>
+                <option>Hard</option>
+              </select>
+            </label>
+
+            <label>
+              Focus minutes
+              <input
+                type="number"
+                min="5"
+                max="90"
+                value={suggestion.focusMinutes}
+                onChange={(event) =>
+                  updateSuggestion("focusMinutes", event.target.value)
+                }
+              />
+            </label>
+
+            <label>
+              Sessions
+              <input
+                type="number"
+                min="1"
+                max="8"
+                value={suggestion.sessions}
+                onChange={(event) =>
+                  updateSuggestion("sessions", event.target.value)
+                }
+              />
+            </label>
+
+            <label>
+              Break minutes
+              <input
+                type="number"
+                min="1"
+                max="45"
+                value={suggestion.breakMinutes}
+                onChange={(event) =>
+                  updateSuggestion("breakMinutes", event.target.value)
+                }
+              />
+            </label>
+          </div>
+
+          <button
+            className="primary-action"
+            onClick={handleStart}
+            disabled={!hasSuggestion && !taskName.trim()}
+          >
+            Confirm To Start
+          </button>
+        </div>
         )}
 
         {(workflowStep === 4 || workflowStep === 5) && (
-          <div className="panel timer-panel stage-panel">
-            <div className="panel-heading">
-              <div>
-                <h2>{mode === "break" ? "Break Timer" : "Focus Timer"}</h2>
-                <p>{activeTask ? activeTask.name : "Start a task to activate the countdown."}</p>
-              </div>
-              {taskQueue.length > 0 && (
-                <div className="queue-count-badge">{taskQueue.length} task{taskQueue.length !== 1 ? "s" : ""} queued</div>
-              )}
-            </div>
-
-            <div className={`timer-display ${mode}`}>
-              <span>{formatTime(timerSeconds)}</span>
+        <div className="panel timer-panel stage-panel">
+          <div className="panel-heading">
+            <div>
+              <h2>{mode === "break" ? "Break Timer" : "Focus Timer"}</h2>
               <p>
                 {activeTask
-                  ? `${remainingSessions} session${remainingSessions === 1 ? "" : "s"} left`
-                  : "No active task"}
+                  ? activeTask.name
+                  : "Start a task to activate the countdown."}
               </p>
             </div>
-
-            <div className="timer-actions">
-              <button className="primary-action" onClick={() => setIsRunning(true)} disabled={!activeTask || isRunning || timerSeconds === 0}>
-                Start
-              </button>
-              <button onClick={() => setIsRunning(false)} disabled={!isRunning}>Pause</button>
-              <button onClick={handleStopTask} disabled={!activeTask}>Stop</button>
-            </div>
-
-            {statusMessage && <p className="status-line">{statusMessage}</p>}
           </div>
+
+          <div className={`timer-display ${mode}`}>
+            <span>{formatTime(timerSeconds)}</span>
+            <p>
+              {activeTask
+                ? `${remainingSessions} session${
+                    remainingSessions === 1 ? "" : "s"
+                  } left`
+                : "No active task"}
+            </p>
+          </div>
+
+          <div className="timer-actions">
+            <button
+              className="primary-action"
+              onClick={() => setIsRunning(true)}
+              disabled={!activeTask || isRunning || timerSeconds === 0}
+            >
+              Start
+            </button>
+            <button onClick={() => setIsRunning(false)} disabled={!isRunning}>
+              Pause
+            </button>
+            <button onClick={handleStopTask} disabled={!activeTask}>
+              Stop
+            </button>
+          </div>
+
+          {statusMessage && <p className="status-line">{statusMessage}</p>}
+        </div>
         )}
 
         {workflowStep === 6 && (
-          <div className="panel dashboard-panel stage-panel">
-            <div className="panel-heading">
-              <div>
-                <h2>Dashboard</h2>
-                <p>Summary and a simple focus tip.</p>
-              </div>
-            </div>
-
-            <div className="dashboard-metrics">
-              <div><span>{completedTasks.length}</span><p>tasks done</p></div>
-              <div><span>{totalFocusMinutes}</span><p>focus minutes</p></div>
-              <div>
-                <span>{completedTasks.length ? Math.round(totalFocusMinutes / completedTasks.length) : 0}</span>
-                <p>avg minutes</p>
-              </div>
-            </div>
-
-            <div className="tip-box">
-              Start hard tasks while your energy is highest, then use breaks to reset before the next session.
-            </div>
-
-            {/* Remaining Queue on Dashboard */}
-            {prioritizedQueue.length > 0 && (
-              <div className="dashboard-queue">
-                <p className="queue-label">Up Next — {prioritizedQueue.length} task{prioritizedQueue.length !== 1 ? "s" : ""} remaining</p>
-                <div className="queue-list compact">
-                  {prioritizedQueue.slice(0, 5).map((task, index) => {
-                    const score = getPriorityScore(task.difficulty, task.deadline);
-                    const { label, cls } = getPriorityLabel(score);
-                    return (
-                      <div key={task.id} className="queue-item">
-                        <div className="queue-rank">#{index + 1}</div>
-                        <div className="queue-info">
-                          <div className="queue-top">
-                            <strong>{task.name}</strong>
-                            <span className={`priority-badge ${cls}`}>{label}</span>
-                          </div>
-                          <div className="queue-meta">
-                            <span>{task.difficulty}</span>
-                            <span>·</span>
-                            <span>{Math.round(daysUntil(task.deadline))}d left</span>
-                          </div>
-                        </div>
-                        <button className="primary-action plan-btn" onClick={() => { setWorkflowStep(1); handlePlanTask(task); }}>
-                          Plan
-                        </button>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-
-            <div className="task-history">
-              {completedTasks.slice(0, 3).map((task) => (
-                <article key={task.id}>
-                  <strong>{task.name}</strong>
-                  <span>{task.sessions} x {task.focusMinutes} min</span>
-                </article>
-              ))}
-            </div>
-
-            <div className="stage-actions">
-              {activeTask && (
-                <button onClick={() => setWorkflowStep(mode === "break" ? 5 : 4)}>Back To Timer</button>
-              )}
-              <button className="primary-action" onClick={handleNewTask}>Plan Next Task</button>
+        <div className="panel dashboard-panel stage-panel">
+          <div className="panel-heading">
+            <div>
+              <h2>Dashboard</h2>
+              <p>Summary and a simple focus tip.</p>
             </div>
           </div>
+
+          <div className="dashboard-metrics">
+            <div>
+              <span>{completedTasks.length}</span>
+              <p>tasks done</p>
+            </div>
+            <div>
+              <span>{totalFocusMinutes}</span>
+              <p>focus minutes</p>
+            </div>
+            <div>
+              <span>
+                {completedTasks.length
+                  ? Math.round(totalFocusMinutes / completedTasks.length)
+                  : 0}
+              </span>
+              <p>avg minutes</p>
+            </div>
+          </div>
+
+          <div className="tip-box">
+            Start hard tasks while your energy is highest, then use breaks to
+            reset before the next session.
+          </div>
+
+          <div className="task-history">
+            {completedTasks.slice(0, 3).map((task) => (
+              <article key={task.id}>
+                <strong>{task.name}</strong>
+                <span>
+                  {task.sessions} x {task.focusMinutes} min
+                </span>
+              </article>
+            ))}
+          </div>
+
+          <div className="stage-actions">
+            {activeTask && (
+              <button onClick={() => setWorkflowStep(mode === "break" ? 5 : 4)}>
+                Back To Timer
+              </button>
+            )}
+            <button className="primary-action" onClick={handleNewTask}>
+              Plan Next Task
+            </button>
+          </div>
+        </div>
         )}
       </section>
 
@@ -628,13 +798,11 @@ function App() {
             <h2>{sessionNotice.title}</h2>
             <p>{sessionNotice.message}</p>
             <blockquote>{sessionNotice.quote}</blockquote>
-            {prioritizedQueue.length > 0 && (
-              <p className="next-task-hint">
-                Next up: <strong>{prioritizedQueue[0].name}</strong>
-              </p>
-            )}
-            <button className="primary-action" onClick={() => setSessionNotice(null)}>
-              {mode === "break" ? "Continue Break" : "Back to Queue"}
+            <button
+              className="primary-action"
+              onClick={() => setSessionNotice(null)}
+            >
+              Continue Break
             </button>
           </div>
         </div>
