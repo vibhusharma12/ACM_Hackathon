@@ -99,6 +99,7 @@ Return JSON with exactly these keys:
 }
 
 export default async function handler(request, response) {
+  // 1. Handle CORS (just in case)
   if (request.method === "OPTIONS") {
     response.status(204).end();
     return;
@@ -110,11 +111,28 @@ export default async function handler(request, response) {
   }
 
   try {
-    const task = request.body;
+    // 2. Ensure body is parsed (Vercel usually does this, but let's be safe)
+    let task = request.body;
+    if (typeof task === "string") {
+      try {
+        task = JSON.parse(task);
+      } catch (e) {
+        throw new Error("Failed to parse request body as JSON.");
+      }
+    }
+
+    if (!task || !task.taskName) {
+      throw new Error("Missing task details in request body.");
+    }
+
+    // 3. Generate plan
+    console.log("Generating plan for:", task.taskName);
     const plan = await createPlan(task);
+    
+    // 4. Send response
     response.status(200).json(plan);
   } catch (error) {
-    console.error("API Error:", error);
+    console.error("Vercel API Error:", error.message);
     response.status(500).json({
       error: error instanceof Error ? error.message : "Internal Server Error",
     });
