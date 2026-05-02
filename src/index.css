@@ -106,6 +106,7 @@ body {
     linear-gradient(160deg, #05080f 0%, var(--bg) 55%, #0d1526 100%);
   color: var(--ink);
   -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
 }
 
 /* ─── Form elements ────────────────────────────────────────────────── */
@@ -311,90 +312,6 @@ h2 {
   font-weight: 700;
 }
 
-/* ─── Step indicator ─────────────────────────────────────────────────── */
-.step-indicator {
-  display: flex;
-  align-items: center;
-  gap: 0;
-  margin-bottom: 16px;
-  padding: 14px 20px;
-  border-radius: var(--radius-sm);
-  background: rgba(16, 23, 42, .7);
-  border: 1px solid var(--line);
-  overflow-x: auto;
-  scrollbar-width: none;
-  animation: fadeIn .35s ease both;
-}
-
-.step-indicator::-webkit-scrollbar {
-  display: none;
-}
-
-.step-item {
-  display: flex;
-  align-items: center;
-  gap: 0;
-  flex-shrink: 0;
-}
-
-.step-dot {
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  display: grid;
-  place-items: center;
-  font-size: .75rem;
-  font-weight: 900;
-  border: 2px solid var(--line);
-  background: var(--panel);
-  color: var(--muted);
-  transition: all var(--transition);
-  flex-shrink: 0;
-}
-
-.step-dot.done {
-  background: var(--teal);
-  border-color: var(--teal);
-  color: #000;
-}
-
-.step-dot.active {
-  background: var(--violet);
-  border-color: var(--violet);
-  color: #fff;
-  box-shadow: 0 0 0 4px rgba(139, 124, 246, .25);
-}
-
-.step-label {
-  font-size: .72rem;
-  font-weight: 700;
-  color: var(--muted);
-  margin-left: 7px;
-  white-space: nowrap;
-  transition: color var(--transition);
-}
-
-.step-label.active {
-  color: var(--ink);
-}
-
-.step-label.done {
-  color: var(--teal-2);
-}
-
-.step-line {
-  width: 32px;
-  height: 2px;
-  background: var(--line);
-  margin: 0 6px;
-  border-radius: 1px;
-  transition: background var(--transition);
-  flex-shrink: 0;
-}
-
-.step-line.done {
-  background: var(--teal);
-}
 
 /* ─── Stage shell + panels ───────────────────────────────────────────── */
 .stage-shell {
@@ -1377,4 +1294,99 @@ h2 {
 
 .tl-break {
   color: #22c55e; /* Green */
+}
+
+/* ─── Responsive adjustments ────────────────────────────────────────── */
+
+/* Tablets and small desktops (under 1024px) */
+@media (max-width: 1024px) {
+  .hero-panel {
+    padding: 24px;
+    gap: 20px;
+  }
+}
+
+/* Medium devices (tablets, under 768px) */
+@media (max-width: 768px) {
+  .hero-panel {
+    flex-direction: column;
+    padding: 24px;
+  }
+
+  .hero-stats {
+    grid-template-columns: repeat(3, 1fr);
+    text-align: center;
+    gap: 8px;
+  }
+
+  .hero-stats p {
+    grid-row: 2;
+  }
+
+  .charts-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .suggestion-grid,
+  .dashboard-metrics,
+  .control-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+/* Small devices (phones, under 540px) */
+@media (max-width: 540px) {
+  .app-shell {
+    padding: 16px 0 40px;
+    width: calc(100% - 20px);
+  }
+
+  .hero-panel {
+    padding: 20px;
+    text-align: center;
+  }
+
+  .hero-actions {
+    justify-content: center;
+  }
+
+  .hero-stats {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .hero-stats p {
+    grid-row: auto;
+  }
+
+  .suggestion-grid,
+  .dashboard-metrics,
+  .control-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .panel {
+    padding: 16px;
+  }
+
+  .timer-text span {
+    font-size: 2.8rem;
+  }
+
+  .timer-ring-container {
+    width: 180px;
+    height: 180px;
+  }
+
+  .timer-text {
+    transform: translateY(35px);
+  }
+
+  .stage-actions {
+    justify-content: stretch;
+  }
+
+  .stage-actions button {
+    flex: 1;
+  }
 }

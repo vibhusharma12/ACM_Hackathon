@@ -21,6 +21,7 @@ const DIFFICULTY_WEIGHT = { Easy: 1, Medium: 2, Hard: 3 };
 const RING_R = 88;
 const RING_C = 2 * Math.PI * RING_R;
 
+
 /* ─── Priority algorithm ─────────────────────────────────────────────── */
 function getPriorityScore(difficulty, deadline) {
   const days = daysUntil(deadline);
@@ -302,6 +303,7 @@ function App() {
   const [workflowStep, setWorkflowStep] = useState(1);
   const [sessionNotice, setSessionNotice] = useState(null);
   const [isSuggesting, setIsSuggesting] = useState(false);
+  const [isPostTaskBreak, setIsPostTaskBreak] = useState(false);
 
   const todayInputValue = getTodayInputValue();
 
@@ -541,9 +543,6 @@ function App() {
           <p>queued</p>
         </div>
       </section>
-
-      {/* Step indicator */}
-      <StepIndicator workflowStep={workflowStep} />
 
       {/* Workflow panels */}
       <section className="stage-shell">
