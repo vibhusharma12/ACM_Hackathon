@@ -3,8 +3,8 @@
 An intelligent productivity system that helps users decide what to work on and how to approach it using AI.
 
 ## Live Demo
-https://vercel.com/rutamups-projects/acm-hackathon-9u15/deployments?environment=production
 
+https://acm-hackathon-eta.vercel.app
 Recommended for the best experience.
 
 ## Overview
